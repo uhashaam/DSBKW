@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "translate-en.cjs",
+    "verify-en.cjs",
+    ".translate-cache.en.json",
   ]),
 ]);
 
