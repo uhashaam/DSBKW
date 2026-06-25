@@ -1,6 +1,5 @@
-import titleCacheEnData from '../../.translate-cache.en.json';
-import settingsData from './settings.json';
-import parsedPosts from '../../scripts/data.json';
+import fs from 'fs';
+import path from 'path';
 
 export interface SEOData {
   focusKeyword?: string;
@@ -73,7 +72,16 @@ let settingsCache: SiteSettings | null = null;
 let titleCacheEn: Record<string, string> | null = null;
 
 function getTitleCacheEn(): Record<string, string> {
-  return titleCacheEnData as Record<string, string>;
+  if (titleCacheEn) return titleCacheEn;
+  try {
+    const cachePath = path.join(process.cwd(), '.translate-cache.en.json');
+    if (!fs.existsSync(cachePath)) return {};
+    const raw = fs.readFileSync(cachePath, 'utf8');
+    titleCacheEn = JSON.parse(raw) as Record<string, string>;
+    return titleCacheEn;
+  } catch {
+    return {};
+  }
 }
 
 const zhToEnCategoryMap: Record<string, string> = {
@@ -99,16 +107,52 @@ export function clearCaches() {
 }
 
 export async function getSettings(): Promise<SiteSettings> {
-  return settingsData as SiteSettings;
+  if (settingsCache) return settingsCache;
+
+  const settingsPath = path.join(process.cwd(), 'src', 'lib', 'settings.json');
+  try {
+    const fileContents = fs.readFileSync(settingsPath, 'utf8');
+    settingsCache = JSON.parse(fileContents);
+    return settingsCache!;
+  } catch (error) {
+    console.error("Failed to read settings.json, returning defaults", error);
+    // Return empty fallback settings
+    return {
+      siteName_zh: "电商百科网",
+      siteName_en: "E-Commerce Encyclopedia",
+      siteDescription_zh: "一站式服务平台",
+      siteDescription_en: "One-stop service platform",
+      seo_separator: "-",
+      seo_title_template: "%title% %sep% %sitename%",
+      seo_description_template: "%excerpt%",
+      languages: ["zh", "en"],
+      defaultLanguage: "zh",
+      wechatContact: "18930311251",
+      partners: [],
+      toolCategories: []
+    };
+  }
 }
 
 export async function getPosts(): Promise<Article[]> {
   if (postsCache) return postsCache;
   
+  // Reading from scripts/data.json
+  const candidatePaths = [
+    // original expected location (repo sibling)
+    path.join(process.cwd(), '..', 'scripts', 'data.json'),
+    // fallback: within this project
+    path.join(process.cwd(), 'scripts', 'data.json'),
+  ];
+  const dataPath = candidatePaths.find((p) => fs.existsSync(p));
   try {
+    if (!dataPath) return [];
+    const fileContents = fs.readFileSync(dataPath, 'utf8');
+    const parsedPosts = JSON.parse(fileContents) as Article[];
+
     // Apply safe EN fallbacks (so EN pages can render even if some fields are missing)
     const titleCache = getTitleCacheEn();
-    postsCache = (parsedPosts as Article[]).map((post) => {
+    postsCache = parsedPosts.map((post) => {
       const title_en = post.title_en || titleCache[post.title];
       const categories_en =
         post.categories_en && post.categories_en.length > 0
@@ -131,7 +175,7 @@ export async function getPosts(): Promise<Article[]> {
     
     return postsCache || [];
   } catch (error) {
-    console.error("Failed to process posts", error);
+    console.error("Failed to read data.json", error);
     return [];
   }
 }

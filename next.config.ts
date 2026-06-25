@@ -1,17 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: 'standalone',
+  output: 'export',
   trailingSlash: true,
   images: {
     unoptimized: true,
-  },
-  outputFileTracingIncludes: {
-    '/**/*': [
-      './scripts/data.json',
-      './src/lib/settings.json',
-      './.translate-cache.en.json'
-    ],
   },
 };
 
