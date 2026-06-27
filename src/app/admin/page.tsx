@@ -84,6 +84,8 @@ export default function AdminPage() {
   const router = useRouter();
   const [authed] = useState(() => {
     if (typeof window === "undefined") return false;
+    // Auto‑auth when running locally on localhost (development)
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") return true;
     return isAdminAuthed();
   });
 
@@ -121,6 +123,7 @@ export default function AdminPage() {
           const postsRes = await fetch(`${API_BASE}/posts`);
           if (postsRes.ok) {
             const postsData = await postsRes.json();
+            console.log('Fetched posts count:', postsData.length);
             setPosts(postsData);
           }
         }

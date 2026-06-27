@@ -3,10 +3,10 @@ const path = require('path');
 const cheerio = require('cheerio');
 
 const sourceDir = 'E:\\DSBKW';
-const targetFile = 'E:\\DSBKW\\scripts\\data.json';
+const targetFile = 'E:\\DSBKW\\next-app\\public\\data.json';
 
 const excludeDirs = new Set([
-    'category', 'page', 'author', 'search', 'tools', 'com', 'social', 'bridge', 'b2b',
+    'category', 'page', 'author', 'tools',
     'wp-admin', 'wp-content', 'wp-includes', 'next-app', 'scripts', 'comments'
 ]);
 

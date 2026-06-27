@@ -109,7 +109,7 @@ export function clearCaches() {
 export async function getSettings(): Promise<SiteSettings> {
   if (settingsCache) return settingsCache;
 
-  const settingsPath = path.join(process.cwd(), 'src', 'lib', 'settings.json');
+  const settingsPath = path.join(process.cwd(), 'public', 'settings.json');
   try {
     const fileContents = fs.readFileSync(settingsPath, 'utf8');
     settingsCache = JSON.parse(fileContents);
@@ -139,18 +139,48 @@ export async function getPosts(): Promise<Article[]> {
   
   // Reading from scripts/data.json
   const candidatePaths = [
-    // original expected location (repo sibling)
-    path.join(process.cwd(), '..', 'scripts', 'data.json'),
-    // fallback: within this project
-    path.join(process.cwd(), 'scripts', 'data.json'),
+    path.join(process.cwd(), 'public', 'data.json')
   ];
   const dataPath = candidatePaths.find((p) => fs.existsSync(p));
   try {
     if (!dataPath) return [];
+    // Check for chunked data directory
+    const chunkDir = path.join(process.cwd(), 'public', 'data');
+    if (fs.existsSync(chunkDir)) {
+      const indexPath = path.join(chunkDir, 'index.json');
+      if (fs.existsSync(indexPath)) {
+        const indexContent = fs.readFileSync(indexPath, 'utf8');
+        const chunkFiles: string[] = JSON.parse(indexContent);
+        let allItems: any[] = [];
+        for (const file of chunkFiles) {
+          const filePath = path.join(chunkDir, file);
+          if (fs.existsSync(filePath)) {
+            const raw = fs.readFileSync(filePath, 'utf8');
+            const items = JSON.parse(raw) as any[];
+            allItems = allItems.concat(items);
+          }
+        }
+        // Apply EN fallbacks after loading chunks
+        const titleCache = getTitleCacheEn();
+        postsCache = allItems.map((post) => {
+          const title_en = post.title_en || titleCache[post.title];
+          const categories_en =
+            post.categories_en && post.categories_en.length > 0
+              ? post.categories_en
+              : (post.categories || []).map((c: string) => zhToEnCategoryMap[c] || c);
+          return { ...post, title_en, categories_en };
+        });
+        postsCache?.sort((a, b) => {
+          const dateA = a.publishedTime ? new Date(a.publishedTime).getTime() : 0;
+          const dateB = b.publishedTime ? new Date(b.publishedTime).getTime() : 0;
+          return dateB - dateA;
+        });
+        return postsCache || [];
+      }
+    }
+    // Fallback to single data.json
     const fileContents = fs.readFileSync(dataPath, 'utf8');
     const parsedPosts = JSON.parse(fileContents) as Article[];
-
-    // Apply safe EN fallbacks (so EN pages can render even if some fields are missing)
     const titleCache = getTitleCacheEn();
     postsCache = parsedPosts.map((post) => {
       const title_en = post.title_en || titleCache[post.title];
@@ -158,21 +188,13 @@ export async function getPosts(): Promise<Article[]> {
         post.categories_en && post.categories_en.length > 0
           ? post.categories_en
           : (post.categories || []).map((c) => zhToEnCategoryMap[c] || c);
-
-      return {
-        ...post,
-        title_en,
-        categories_en,
-      };
+      return { ...post, title_en, categories_en };
     });
-    
-    // Sort by publishedTime descending
     postsCache?.sort((a, b) => {
       const dateA = a.publishedTime ? new Date(a.publishedTime).getTime() : 0;
       const dateB = b.publishedTime ? new Date(b.publishedTime).getTime() : 0;
       return dateB - dateA;
     });
-    
     return postsCache || [];
   } catch (error) {
     console.error("Failed to read data.json", error);
