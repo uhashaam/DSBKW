@@ -45,10 +45,10 @@ export default function Header() {
       // Switch to Chinese
       let newPath = pathname.replace(/^\/en/, '');
       if (newPath === '/media-nav' || newPath === '/media-nav/') {
-        newPath = '/自媒体导航/';
+        newPath = '/media-nav/';
       }
       if (newPath === '/contact' || newPath === '/contact/') {
-        newPath = '/关于我们/';
+        newPath = '/about/';
       }
       if (!newPath) newPath = '/';
       router.push(newPath);
@@ -57,9 +57,9 @@ export default function Header() {
       let newPath = pathname;
       if (pathname === '/' || pathname === '') {
         newPath = '/en/';
-      } else if (pathname === '/自媒体导航' || pathname === '/自媒体导航/') {
+      } else if (pathname === '/media-nav' || pathname === '/media-nav/') {
         newPath = '/en/media-nav/';
-      } else if (pathname === '/关于我们' || pathname === '/关于我们/') {
+      } else if (pathname === '/about' || pathname === '/about/') {
         newPath = '/en/contact/';
       } else {
         newPath = `/en${pathname}`;
@@ -74,11 +74,11 @@ export default function Header() {
       if (path === '/') return '/en/';
       return `/en${path}`;
     }
-    if (path === '/contact/') return '/关于我们/';
+    if (path === '/contact/') return '/about/';
     return path;
   };
 
-  const mediaNavHref = isEn ? "/en/media-nav/" : "/自媒体导航/";
+  const mediaNavHref = isEn ? "/en/media-nav/" : "/media-nav/";
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur-md shadow-sm">

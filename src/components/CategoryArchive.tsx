@@ -53,6 +53,40 @@ export default async function CategoryArchive({ slug, pageNumber, lang }: Catego
     return `${langPrefix}/category/${slug}/page/${page}/`;
   };
 
+  // Generate pages list to display (with ellipsis)
+  const getPageNumbers = () => {
+    const pages: (number | string)[] = [];
+    const maxVisible = 10;
+    
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      // Always show page 1
+      pages.push(1);
+      
+      const leftBound = Math.max(2, pageNumber - 3);
+      const rightBound = Math.min(totalPages - 1, pageNumber + 3);
+      
+      if (leftBound > 2) {
+        pages.push('...');
+      }
+      
+      for (let i = leftBound; i <= rightBound; i++) {
+        pages.push(i);
+      }
+      
+      if (rightBound < totalPages - 1) {
+        pages.push('...');
+      }
+      
+      // Always show last page
+      pages.push(totalPages);
+    }
+    return pages;
+  };
+
   return (
     <div className="bg-slate-50 min-h-screen py-10">
       <div className="container mx-auto px-4 max-w-7xl">
@@ -106,13 +140,22 @@ export default async function CategoryArchive({ slug, pageNumber, lang }: Catego
                     </span>
                   )}
 
-                  {Array.from({ length: totalPages }).map((_, i) => {
-                    const page = i + 1;
+                  {getPageNumbers().map((page, i) => {
+                    if (page === '...') {
+                      return (
+                        <span
+                          key={`dots-${i}`}
+                          className="w-10 h-10 flex items-center justify-center text-slate-400 font-bold"
+                        >
+                          ...
+                        </span>
+                      );
+                    }
                     const isActive = page === pageNumber;
                     return (
                       <Link
                         key={page}
-                        href={getPageLink(page)}
+                        href={getPageLink(page as number)}
                         className={`w-10 h-10 flex items-center justify-center border rounded-lg text-sm font-bold transition-all ${
                           isActive
                             ? "bg-orange-600 border-orange-600 text-white shadow-md shadow-orange-600/20"

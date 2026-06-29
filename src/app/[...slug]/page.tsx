@@ -2,6 +2,8 @@ import { getPosts, getPostBySlug, getSettings } from "@/lib/data";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Metadata } from "next";
+import ContactCN from "@/app/about/page";
+import MediaNavigationPage from "@/app/media-nav/page";
 
 interface Props {
   params: Promise<{ slug: string[] }>;
@@ -33,6 +35,10 @@ export async function generateStaticParams() {
     });
   }
 
+  // Add Chinese legacy page routes so they compile successfully and don't throw runtime errors
+  params.push({ slug: ["关于我们"] });
+  params.push({ slug: ["自媒体导航"] });
+
   // Fallback to prevent export-time error if posts are empty/missing during build
   if (params.length === 0) {
     params.push({ slug: ["__placeholder__"] });
@@ -48,6 +54,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const postSlug = isEn ? slug.slice(1).join('/') : slug.join('/');
   const lang = isEn ? 'en' : 'zh';
   
+  if (postSlug === '关于我们') {
+    return {
+      title: "关于我们 - 电商百科网",
+      description: "一站式电商解决方案，关于我们与商务合作。"
+    };
+  }
+  if (postSlug === '自媒体导航') {
+    return {
+      title: "自媒体导航 - 电商百科网",
+      description: "主流自媒体平台导航：社交、视频、文章、音频平台一站式入口。"
+    };
+  }
+
   const post = await getPostBySlug(postSlug, lang);
   const settings = await getSettings();
 
@@ -97,6 +116,13 @@ export default async function PostPage({ params }: Props) {
   const isEn = slug[0] === 'en';
   const postSlug = isEn ? slug.slice(1).join('/') : slug.join('/');
   const lang = isEn ? 'en' : 'zh';
+
+  if (postSlug === '关于我们') {
+    return <ContactCN />;
+  }
+  if (postSlug === '自媒体导航') {
+    return <MediaNavigationPage />;
+  }
 
   const post = await getPostBySlug(postSlug, lang);
   const settings = await getSettings();

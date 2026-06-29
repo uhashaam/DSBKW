@@ -143,21 +143,50 @@ export default function AdminPage() {
       } catch (err) {
         console.warn('Local Admin API server is offline. Running in read-only / demo mode.', err);
         setIsServerOnline(false);
-        // Load default mock data for demo fallback
-        setSettings({
-          siteName_zh: "电商百科网",
-          siteName_en: "E-Commerce Encyclopedia",
-          siteDescription_zh: "一站式电商导航平台",
-          siteDescription_en: "One-stop ecommerce navigation platform",
-          seo_separator: "-",
-          seo_title_template: "%title% %sep% %sitename%",
-          seo_description_template: "%excerpt%",
-          languages: ["zh", "en"],
-          defaultLanguage: "zh",
-          wechatContact: "18930311251",
-          partners: [],
-          toolCategories: []
-        });
+        
+        let loadedSettings = null;
+        try {
+          const settingsRes = await fetch('/settings.json');
+          if (settingsRes.ok) {
+            loadedSettings = await settingsRes.json();
+            setSettings(loadedSettings);
+          }
+        } catch (e) {
+          console.warn('Could not load static settings.json', e);
+        }
+
+        if (!loadedSettings) {
+          setSettings({
+            siteName_zh: "电商百科网",
+            siteName_en: "E-Commerce Encyclopedia",
+            siteDescription_zh: "一站式电商导航平台",
+            siteDescription_en: "One-stop ecommerce navigation platform",
+            seo_separator: "-",
+            seo_title_template: "%title% %sep% %sitename%",
+            seo_description_template: "%excerpt%",
+            languages: ["zh", "en"],
+            defaultLanguage: "zh",
+            wechatContact: "18930311251",
+            partners: [],
+            toolCategories: []
+          });
+        }
+
+        try {
+          const postsRes = await fetch('/data/data.json');
+          if (postsRes.ok) {
+            const postsData = await postsRes.json();
+            setPosts(postsData);
+          } else {
+            const postsResAlt = await fetch('/data.json');
+            if (postsResAlt.ok) {
+              const postsData = await postsResAlt.json();
+              setPosts(postsData);
+            }
+          }
+        } catch (e) {
+          console.warn('Could not load static data.json', e);
+        }
       } finally {
         setLoading(false);
       }
