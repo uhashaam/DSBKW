@@ -109,6 +109,19 @@ export default function AdminPage() {
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('');
   const [editorLanguage, setEditorLanguage] = useState<'zh' | 'en' | 'seo'>('zh');
 
+  // Media library states
+  const [mediaList, setMediaList] = useState<string[]>([]);
+  const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
+  const [mediaSearch, setMediaSearch] = useState('');
+  const [mediaLoading, setMediaLoading] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  // Category states
+  const [customCategories, setCustomCategories] = useState<string[]>([]);
+  const [newCategoryInput, setNewCategoryInput] = useState('');
+  const [customCategoriesEn, setCustomCategoriesEn] = useState<string[]>([]);
+  const [newCategoryInputEn, setNewCategoryInputEn] = useState('');
+
   // Load configuration and verify API health
   useEffect(() => {
     if (!authed) return;
@@ -151,6 +164,161 @@ export default function AdminPage() {
     }
     init();
   }, [authed]);
+
+  // Fetch all media files
+  const fetchMedia = async () => {
+    setMediaLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/media`);
+      if (res.ok) {
+        const data = await res.json();
+        setMediaList(data.media || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch media:', err);
+    } finally {
+      setMediaLoading(false);
+    }
+  };
+
+  // Fetch media when modal opens
+  useEffect(() => {
+    if (isMediaModalOpen) {
+      fetchMedia();
+    }
+  }, [isMediaModalOpen]);
+
+  // Upload an image and set it as featured image
+  const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingImage(true);
+
+    try {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64 = (reader.result as string).split(',')[1];
+        const res = await fetch(`${API_BASE}/upload`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filename: `${Date.now()}_${file.name}`,
+            base64Data: base64
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          await fetchMedia();
+          if (editingPost) {
+            setEditingPost({ ...editingPost, featuredImage: data.url });
+          }
+          setIsMediaModalOpen(false);
+        } else {
+          alert('图片上传失败');
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Upload error:', err);
+      alert('上传发生错误');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  // Get all unique categories from posts database + newly added ones
+  const getUniqueCategories = () => {
+    const collected = new Set<string>();
+    // Default system categories to always have them available
+    const systemCats = ['京东', '拼多多', '淘宝天猫', '电商资讯', '直播带货', '跨境电商'];
+    systemCats.forEach(c => collected.add(c));
+    
+    posts.forEach(p => {
+      if (p.categories) {
+        p.categories.forEach(c => {
+          if (c && c.trim()) collected.add(c.trim());
+        });
+      }
+    });
+    customCategories.forEach(c => collected.add(c));
+    return Array.from(collected);
+  };
+
+  const getUniqueCategoriesEn = () => {
+    const collected = new Set<string>();
+    const systemCatsEn = ['Jingdong', 'Pinduoduo', 'Taobao Tmall', 'E-Commerce News', 'Live Streaming', 'Cross-Border'];
+    systemCatsEn.forEach(c => collected.add(c));
+
+    posts.forEach(p => {
+      if (p.categories_en) {
+        p.categories_en.forEach(c => {
+          if (c && c.trim()) collected.add(c.trim());
+        });
+      }
+    });
+    customCategoriesEn.forEach(c => collected.add(c));
+    return Array.from(collected);
+  };
+
+  // Category toggle actions
+  const handleToggleCategory = (cat: string) => {
+    if (!editingPost) return;
+    const currentCats = [...editingPost.categories];
+    const idx = currentCats.indexOf(cat);
+    if (idx > -1) {
+      currentCats.splice(idx, 1);
+    } else {
+      currentCats.push(cat);
+    }
+    setEditingPost({ ...editingPost, categories: currentCats });
+  };
+
+  const handleToggleCategoryEn = (cat: string) => {
+    if (!editingPost) return;
+    const currentCats = [...(editingPost.categories_en || [])];
+    const idx = currentCats.indexOf(cat);
+    if (idx > -1) {
+      currentCats.splice(idx, 1);
+    } else {
+      currentCats.push(cat);
+    }
+    setEditingPost({ ...editingPost, categories_en: currentCats });
+  };
+
+  // Add custom category actions
+  const handleAddNewCategory = () => {
+    const cat = newCategoryInput.trim();
+    if (!cat) return;
+    if (!customCategories.includes(cat)) {
+      setCustomCategories([...customCategories, cat]);
+    }
+    if (editingPost && !editingPost.categories.includes(cat)) {
+      setEditingPost({
+        ...editingPost,
+        categories: [...editingPost.categories, cat]
+      });
+    }
+    setNewCategoryInput('');
+  };
+
+  const handleAddNewCategoryEn = () => {
+    const cat = newCategoryInputEn.trim();
+    if (!cat) return;
+    if (!customCategoriesEn.includes(cat)) {
+      setCustomCategoriesEn([...customCategoriesEn, cat]);
+    }
+    if (editingPost) {
+      const currentCats = editingPost.categories_en || [];
+      if (!currentCats.includes(cat)) {
+        setEditingPost({
+          ...editingPost,
+          categories_en: [...currentCats, cat]
+        });
+      }
+    }
+    setNewCategoryInputEn('');
+  };
+
 
   if (!authed) {
     return (
@@ -955,14 +1123,35 @@ export default function AdminPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">特色图片路径 (Featured Image)</label>
-                        <input
-                          type="text"
-                          className="w-full border rounded-lg p-2.5 outline-none focus:border-orange-500 font-mono text-xs"
-                          value={editingPost.featuredImage || ''}
-                          onChange={(e) => setEditingPost({ ...editingPost, featuredImage: e.target.value })}
-                          disabled={!isServerOnline}
-                        />
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">特色图片 (Featured Image)</label>
+                        <div className="flex items-center space-x-3 border rounded-lg p-2.5 bg-gray-50 h-[46px]">
+                          {editingPost.featuredImage ? (
+                            <img
+                              src={editingPost.featuredImage}
+                              alt="Featured Preview"
+                              className="w-10 h-7 object-cover rounded border bg-white"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = '/wp-content/uploads/2024/08/20240813-161115.png';
+                              }}
+                            />
+                          ) : (
+                            <div className="w-10 h-7 bg-slate-200 border rounded flex items-center justify-center text-slate-400 text-[10px] font-bold">
+                              无图
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0 flex items-center justify-between">
+                            <span className="text-xs text-slate-500 truncate font-mono max-w-[100px]">
+                              {editingPost.featuredImage ? editingPost.featuredImage.split('/').pop() : '未选择'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setIsMediaModalOpen(true)}
+                              className="text-xs text-orange-600 hover:text-orange-700 font-bold"
+                            >
+                              📁 选择/上传
+                            </button>
+                          </div>
+                        </div>
                       </div>
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-2">发布时间</label>
@@ -976,14 +1165,51 @@ export default function AdminPage() {
                       </div>
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-2">所属栏目分类 (中文)</label>
-                        <input
-                          type="text"
-                          className="w-full border rounded-lg p-2.5 outline-none focus:border-orange-500"
-                          placeholder="例如: 电商资讯"
-                          value={editingPost.categories.join(', ')}
-                          onChange={(e) => setEditingPost({ ...editingPost, categories: e.target.value.split(',').map(s => s.trim()) })}
-                          disabled={!isServerOnline}
-                        />
+                        <div className="border rounded-lg p-2 bg-gray-50 space-y-2">
+                          <div className="flex flex-wrap gap-1 max-h-[120px] overflow-y-auto">
+                            {getUniqueCategories().map(cat => {
+                              const isChecked = editingPost.categories.includes(cat);
+                              return (
+                                <button
+                                  key={cat}
+                                  type="button"
+                                  onClick={() => handleToggleCategory(cat)}
+                                  className={`px-2 py-1 rounded text-[11px] font-medium border transition-all flex items-center ${
+                                    isChecked
+                                      ? 'bg-orange-600 text-white border-orange-600 shadow-xs'
+                                      : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
+                                  }`}
+                                >
+                                  {isChecked && <span className="mr-1">✓</span>}
+                                  <span>{cat}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          
+                          <div className="flex items-center space-x-1 pt-1.5 border-t border-slate-200">
+                            <input
+                              type="text"
+                              placeholder="新分类..."
+                              className="flex-1 min-w-0 border rounded px-1.5 py-0.5 text-[11px] outline-none focus:border-orange-500 bg-white"
+                              value={newCategoryInput}
+                              onChange={(e) => setNewCategoryInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleAddNewCategory();
+                                }
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={handleAddNewCategory}
+                              className="bg-slate-800 text-white text-[10px] px-2 py-0.5 rounded hover:bg-slate-700 font-bold shrink-0"
+                            >
+                              + 添加
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
@@ -1031,14 +1257,51 @@ export default function AdminPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <label className="block text-sm font-semibold text-gray-700 mb-2">Categories (English)</label>
-                        <input
-                          type="text"
-                          className="w-full border rounded-lg p-2.5 outline-none focus:border-orange-500"
-                          placeholder="e.g. E-Commerce News, Wiki"
-                          value={editingPost.categories_en?.join(', ') || ''}
-                          onChange={(e) => setEditingPost({ ...editingPost, categories_en: e.target.value.split(',').map(s => s.trim()) })}
-                          disabled={!isServerOnline}
-                        />
+                        <div className="border rounded-lg p-2 bg-gray-50 space-y-2">
+                          <div className="flex flex-wrap gap-1 max-h-[120px] overflow-y-auto">
+                            {getUniqueCategoriesEn().map(cat => {
+                              const isChecked = (editingPost.categories_en || []).includes(cat);
+                              return (
+                                <button
+                                  key={cat}
+                                  type="button"
+                                  onClick={() => handleToggleCategoryEn(cat)}
+                                  className={`px-2 py-1 rounded text-[11px] font-medium border transition-all flex items-center ${
+                                    isChecked
+                                      ? 'bg-orange-600 text-white border-orange-600 shadow-xs'
+                                      : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
+                                  }`}
+                                >
+                                  {isChecked && <span className="mr-1">✓</span>}
+                                  <span>{cat}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          <div className="flex items-center space-x-1 pt-1.5 border-t border-slate-200">
+                            <input
+                              type="text"
+                              placeholder="New category..."
+                              className="flex-1 min-w-0 border rounded px-1.5 py-0.5 text-[11px] outline-none focus:border-orange-500 bg-white"
+                              value={newCategoryInputEn}
+                              onChange={(e) => setNewCategoryInputEn(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleAddNewCategoryEn();
+                                }
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={handleAddNewCategoryEn}
+                              className="bg-slate-800 text-white text-[10px] px-2 py-0.5 rounded hover:bg-slate-700 font-bold shrink-0"
+                            >
+                              + Add
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
@@ -1372,6 +1635,131 @@ export default function AdminPage() {
 
         </div>
       </div>
+
+      {/* Media Library Modal */}
+      {isMediaModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden border border-slate-100">
+            {/* Modal Header */}
+            <div className="px-6 py-4 bg-slate-950 text-white flex items-center justify-between border-b shrink-0">
+              <div className="flex items-center space-x-2">
+                <span className="text-xl">📁</span>
+                <span className="font-bold text-base">媒体资源库 (Media Library)</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMediaModalOpen(false)}
+                className="text-gray-400 hover:text-white transition-colors p-1"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+
+            {/* Modal Controls */}
+            <div className="p-4 bg-slate-50 border-b flex flex-wrap items-center justify-between gap-4 shrink-0">
+              <input
+                type="text"
+                placeholder="搜索媒体文件名..."
+                className="flex-1 min-w-[240px] max-w-md border rounded-lg px-3.5 py-2 text-sm outline-none focus:border-orange-500 bg-white text-black"
+                value={mediaSearch}
+                onChange={(e) => setMediaSearch(e.target.value)}
+              />
+
+              <div className="flex items-center space-x-2">
+                <label className="bg-orange-600 text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-orange-700 shadow-md cursor-pointer flex items-center space-x-2 transition-all">
+                  <span>📤 上传新图片</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleUploadImage}
+                    disabled={uploadingImage}
+                  />
+                </label>
+                {uploadingImage && (
+                  <span className="text-xs text-orange-600 font-semibold animate-pulse">正在上传...</span>
+                )}
+              </div>
+            </div>
+
+            {/* Media Grid */}
+            <div className="flex-1 overflow-y-auto p-6 min-h-[300px]">
+              {mediaLoading ? (
+                <div className="h-full flex items-center justify-center flex-col space-y-3">
+                  <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-sm text-slate-500">正在加载媒体资源...</p>
+                </div>
+              ) : (
+                (() => {
+                  const filteredMedia = mediaList.filter(file =>
+                    file.toLowerCase().includes(mediaSearch.toLowerCase())
+                  );
+
+                  if (filteredMedia.length === 0) {
+                    return (
+                      <div className="h-full flex items-center justify-center flex-col text-slate-400 py-12">
+                        <span className="text-4xl mb-2">📷</span>
+                        <p className="text-sm font-medium">未找到匹配的媒体图片</p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-4">
+                      {filteredMedia.map((file) => {
+                        const isSelected = editingPost?.featuredImage === file;
+                        return (
+                          <div
+                            key={file}
+                            onClick={() => {
+                              if (editingPost) {
+                                setEditingPost({ ...editingPost, featuredImage: file });
+                              }
+                              setIsMediaModalOpen(false);
+                            }}
+                            className={`group relative aspect-video border rounded-xl overflow-hidden cursor-pointer bg-slate-50 hover:shadow-md transition-all ${
+                              isSelected ? 'ring-2 ring-orange-500 border-orange-500' : 'border-slate-200'
+                            }`}
+                          >
+                            <img
+                              src={file}
+                              alt="media"
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = '/wp-content/uploads/2024/08/20240813-161115.png';
+                              }}
+                            />
+                            {isSelected && (
+                              <div className="absolute top-2 right-2 bg-orange-500 text-white rounded-full p-1 shadow">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
+                              </div>
+                            )}
+                            <div className="absolute inset-x-0 bottom-0 bg-slate-950/80 text-[10px] text-white px-2 py-1 truncate font-mono">
+                              {file.split('/').pop()}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-slate-50 border-t flex justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsMediaModalOpen(false)}
+                className="px-4 py-2 border rounded-lg bg-white font-semibold text-sm hover:bg-gray-50 transition-colors text-black"
+              >
+                关闭
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

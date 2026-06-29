@@ -153,12 +153,16 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
-    // Media list endpoint - list from public/media
+    // Media list endpoint - list from public/media and public/wp-content/uploads
     if (pathname === '/api/media' && req.method === 'GET') {
       try {
-        const mediaRoot = path.join(__dirname, '..', 'public', 'media');
+        const mediaPaths = [
+          path.join(__dirname, '..', 'public', 'media'),
+          path.join(__dirname, '..', 'public', 'wp-content', 'uploads')
+        ];
         const walk = dir => {
           let results = [];
+          if (!fs.existsSync(dir)) return results;
           const list = fs.readdirSync(dir, { withFileTypes: true });
           list.forEach(entry => {
             const fullPath = path.join(dir, entry.name);
@@ -167,15 +171,22 @@ const server = http.createServer(async (req, res) => {
             } else if (entry.isFile()) {
               const ext = path.extname(entry.name).toLowerCase();
               if (['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg'].includes(ext)) {
-                const rel = fullPath.split('public')[1].replace(/\\\\/g, '/');
-                results.push(rel);
+                // Split at 'public' to get the web path
+                const parts = fullPath.split(path.join('..', 'public'));
+                const relPath = parts.length > 1 ? parts[1] : fullPath.split('public')[1];
+                if (relPath) {
+                  results.push(relPath.replace(/\\/g, '/'));
+                }
               }
             }
           });
           return results;
         };
-        const files = fs.existsSync(mediaRoot) ? walk(mediaRoot) : [];
-        return sendJSON(res, 200, { media: files });
+        let allFiles = [];
+        mediaPaths.forEach(p => {
+          allFiles = allFiles.concat(walk(p));
+        });
+        return sendJSON(res, 200, { media: allFiles });
       } catch (e) {
         console.error('Media list error:', e);
         return sendJSON(res, 500, { error: 'Failed to list media' });
