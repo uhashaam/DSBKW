@@ -946,14 +946,12 @@ export default function AdminPage() {
                   <h2 className="text-xl font-bold text-gray-900">博文内容列表</h2>
                   <p className="text-sm text-gray-500 mt-1">管理系统提取的文章，包含中文和英文翻译版本，设置 Rankmath SEO 指标。</p>
                 </div>
-                {isServerOnline && (
-                  <button
-                    onClick={handleCreateNewPost}
-                    className="bg-orange-600 text-white font-semibold px-5 py-2.5 rounded-lg hover:bg-orange-700 shadow-md transition-all flex items-center space-x-2 cursor-pointer"
-                  >
-                    <span>+ 新建文章</span>
-                  </button>
-                )}
+                <button
+                  onClick={handleCreateNewPost}
+                  className="bg-orange-600 text-white font-semibold px-5 py-2.5 rounded-lg hover:bg-orange-700 shadow-md transition-all flex items-center space-x-2 cursor-pointer"
+                >
+                  <span>+ 新建文章</span>
+                </button>
               </div>
 
               {/* Filters */}
